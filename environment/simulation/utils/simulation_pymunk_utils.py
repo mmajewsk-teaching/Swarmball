@@ -6,9 +6,9 @@ try:
     from . import simulation_utils as utils
     from . import generate_map as gen
 except ImportError:
-    from utils import simulation_utils as utils
-    from utils import generate_map as gen
-
+    # ZMIANA: Usunięcie bloku try-except i pozostawienie tylko importów względnych
+    from . import simulation_utils as utils
+    from . import generate_map as gen
 
 ELASTICITY = 0.3
 FRICTION = 9
@@ -26,7 +26,7 @@ def create_clusters(number_of_clusters, screen_size, number_of_bots_per_threshol
         color = numpy.array([100, 100, 100])
         color[cluster_nr % color.shape[0]] += (cluster_nr + 1) * 37
         color[cluster_nr % color.shape[0]] = color[cluster_nr % color.shape[0]] % 256
-        threshold = utils.Threshold(position=random.randint(-screen_size[0]//6, screen_size[0]//6), velocity=0)
+        threshold = utils.Threshold(position=random.randint(-screen_size[0] // 6, screen_size[0] // 6), velocity=0)
 
         cluster = utils.Cluster(color, threshold, bots=[])
         for _ in range(number_of_bots_per_threshold):
@@ -48,6 +48,8 @@ def create_bot(position_x, color, screen_size, max_distance_from_threshold=100):
     shape.elasticity = ELASTICITY
     shape.friction = FRICTION
 
+    shape._body_to_keep_alive = body
+
     return shape
 
 
@@ -60,6 +62,9 @@ def create_goal_object(position):
     shape = pymunk.Poly.create_box(body, size)
     shape.elasticity = ELASTICITY
     shape.friction = GOAL_OBJECT_FRICTION
+
+    shape._body_to_keep_alive = body
+
     return shape
 
 
@@ -78,11 +83,11 @@ def create_map_segment(difficulty, space, starting_point, segment_size, map_widt
     fragment_start = map_fragments[0]
     map_segment = []
     for fragment_end in map_fragments[1:]:
-        fragment = pymunk.Segment(space.static_body, fragment_start, fragment_end, map_width)
+        # [ZMIANA] Konwersja numpy.ndarray na tuple, ponieważ nowa wersja Pymunk nie obsługuje bezpośrednio tablic numpy jako wektorów
+        fragment = pymunk.Segment(space.static_body, tuple(fragment_start), tuple(fragment_end), map_width)
         fragment_start = fragment_end
         fragment.elasticity = ELASTICITY
         fragment.friction = FRICTION
         map_segment.append(fragment)
     segment_end_point = fragment_end
     return map_segment, segment_end_point
-
