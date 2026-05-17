@@ -17,8 +17,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker images
-        run: docker compose build
+      - name: Build test image
+        run: docker compose build test
 
       - name: Run tests
         run: docker compose run --rm test
