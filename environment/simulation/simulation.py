@@ -55,7 +55,7 @@ class SwarmBallSimulation(object):
         self._dt = 1 / 80.0
         self._segment_count = 0
         self._current_map_end = (-1.5 * map_segment_size[0], 0.0)
-        self._map_middle_right_boundary = (0.5*map_segment_size[0], 0.0)
+        self._map_middle_right_boundary = (0.5 * map_segment_size[0], 0.0)
         self._enemy_position = -map_segment_size[0]
         self._enemy_speed = 0
 
@@ -88,8 +88,6 @@ class SwarmBallSimulation(object):
         return pygame.image.tostring(self._screen, "RGB")
 
     def reset(self):
-        if self._space is not None:
-            self._space.remove(self._space._get_shapes())
         self._space = pymunk.Space()
         self._space.gravity = self.gravity
 
@@ -98,7 +96,6 @@ class SwarmBallSimulation(object):
         self._current_map_end = (-1.5 * self.map_segment_size[0], 0.0)
         self._enemy_position = -1.5 * self.map_segment_size[0]
         self._enemy_speed = 0
-
 
         self._init_simulation_objects()
         self._init_static_scenery()
@@ -130,7 +127,8 @@ class SwarmBallSimulation(object):
             self._current_map_end = segment_end_point
 
         for map_segment in self._map:
-            self._space.add(map_segment)
+            # [ZMIANA] Rozpakowanie listy (użycie *) - w nowym Pymunk add() nie przyjmuje list
+            self._space.add(*map_segment)
         self._update_map_sprite()
 
     def _init_simulation_objects(self):
@@ -139,11 +137,13 @@ class SwarmBallSimulation(object):
                                                       self.number_of_bots_per_cluster)
         self._goal_object = pymunk_utils.create_goal_object(self.initial_object_position)
 
-        objects = [(self._goal_object.body, self._goal_object)]
-        for cluster in self._clusters:
-            [objects.append((bot.body, bot)) for bot in cluster.bots]
+        # [ZMIANA] Dodajemy body i shape bezpośrednio zamiast przekazywać zagnieżdżoną listę krotek
+        self._space.add(self._goal_object.body, self._goal_object)
 
-        self._space.add(objects)
+        for cluster in self._clusters:
+            for bot in cluster.bots:
+                # [ZMIANA] Dodajemy body i shape każdego bota
+                self._space.add(bot.body, bot)
 
     def _update_simulation_objects(self):
         self._update_bots()
@@ -155,7 +155,8 @@ class SwarmBallSimulation(object):
             cluster.threshold.position = cluster.threshold.position + 1
             for bot in cluster.bots:
                 if bot.body.position[1] < self.map_bottom_y_threshold:
-                    self._space.remove(bot)
+                    # [ZMIANA] Usuwamy jednocześnie kształt (shape - bot) i jego ciało (body) z przestrzeni fizycznej
+                    self._space.remove(bot.body, bot)
                     cluster.bots.remove(bot)
                 else:
                     bot.body.angular_velocity = utils.get_bot_velocity(
@@ -172,12 +173,13 @@ class SwarmBallSimulation(object):
                                                                              segment_size=self.map_segment_size,
                                                                              map_width=self.map_width,
                                                                              segment_count=self._segment_count)
-            self._space.remove(self._map[0])
+            # [ZMIANA] Rozpakowanie usuwanego i dodawanego segmentu mapy za pomocą gwiazdki (*)
+            self._space.remove(*self._map[0])
             self._map.pop(0)
             self._map.append(map_segment)
             self._map_middle_right_boundary = self._current_map_end
             self._current_map_end = segment_end_point
-            self._space.add(self._map[-1])
+            self._space.add(*self._map[-1])
             self._update_map_sprite()
 
     def _process_events(self):
@@ -202,7 +204,7 @@ class SwarmBallSimulation(object):
         self._screen.fill(THECOLORS["white"])
         offset = (self.screen_size[0] / 2 - self._goal_object.body.position[0],
                   -self.screen_size[1] // 2 + self._goal_object.body.position[1])
-        self._screen.blit(self._map_sprite, (offset[0]+self._map_offset[0], offset[1]+self._map_offset[1]))
+        self._screen.blit(self._map_sprite, (offset[0] + self._map_offset[0], offset[1] + self._map_offset[1]))
         if self.debug:
             pygame_utils.draw_thresholds(self._screen, self._clusters, offset, self.screen_size)
         pygame_utils.draw_clusters(self._screen, self._clusters, offset)
@@ -212,6 +214,11 @@ class SwarmBallSimulation(object):
         self._update_screen()
         if clock is True:
             self._clock.tick(self.ticks_per_render_frame)
+
+        # [ZMIANA] Dodano obliczenie "offset", ponieważ zmienna nie była tutaj zdefiniowana i powodowała NameError
+        offset = (self.screen_size[0] / 2 - self._goal_object.body.position[0],
+                  -self.screen_size[1] // 2 + self._goal_object.body.position[1])
+
         pygame_utils.draw_enemy(self._screen, self._enemy_position, offset, self.screen_size)
         pygame.display.flip()
 
