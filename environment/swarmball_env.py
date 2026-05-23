@@ -25,8 +25,6 @@ class SwarmBall(gym.Env):
         # Obserwacje to słownik (obraz + pozycje klastrów)
         screen_size = kwargs.get('screen_size', (1800, 840))
         self.observation_space = spaces.Dict({
-            # Zostawiamy Box dla obrazu (choć zwracamy bytes, wrapper RL będzie to przetwarzać)
-            'picture': spaces.Box(low=0, high=255, shape=(screen_size[1], screen_size[0], 3), dtype=np.uint8),
             'thresholds': spaces.Box(low=-np.inf, high=np.inf, shape=(number_of_clusters,), dtype=np.float32)
         })
 
@@ -44,7 +42,6 @@ class SwarmBall(gym.Env):
         self.sim.step()
 
         observations = {
-            'picture': self.sim.space_near_goal_object(),
             'thresholds': np.array(self.sim.threshold_positions(), dtype=np.float32) -
                           self.sim._goal_object.body.position[0]
         }
@@ -68,7 +65,6 @@ class SwarmBall(gym.Env):
         self.initial_goal_position = self.sim._goal_object.body.position[0]
 
         observations = {
-            'picture': self.sim.space_near_goal_object(),
             'thresholds': np.array(self.sim.threshold_positions(), dtype=np.float32) -
                           self.sim._goal_object.body.position[0]
         }
