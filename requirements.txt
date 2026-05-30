@@ -6,3 +6,6 @@ pymunk
 matplotlib
 numpy
 scipy
+tensorboard
+tqdm
+rich

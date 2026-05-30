@@ -1,5 +1,6 @@
 import math
 
+import numpy as np
 import pygame
 from pygame.color import THECOLORS
 from pygame.locals import QUIT, KEYDOWN, K_ESCAPE, K_p
@@ -25,6 +26,7 @@ class SwarmBallSimulation(object):
                  number_of_clusters=3,
                  number_of_bots_per_cluster=10,
                  enemy_acceleration=0.005,
+                 enemy_max_speed=3.0,
                  difficulty=None,
                  map_segment_size=(600, 600),
                  initial_object_height=10,
@@ -52,12 +54,13 @@ class SwarmBallSimulation(object):
 
         # internal simulation properties
         self._simulation_is_running = True
-        self._dt = 1 / 80.0
+        self._dt = 1 / 150.0
         self._segment_count = 0
         self._current_map_end = (-1.5 * map_segment_size[0], 0.0)
         self._map_middle_right_boundary = (0.5 * map_segment_size[0], 0.0)
         self._enemy_position = -map_segment_size[0]
         self._enemy_speed = 0
+        self._enemy_max_speed = enemy_max_speed
 
         # internal simulation objects
         self._map = []
@@ -85,7 +88,9 @@ class SwarmBallSimulation(object):
     # output
     def space_near_goal_object(self):
         self._update_screen()
-        return pygame.image.tostring(self._screen, "RGB")
+        img = pygame.surfarray.array3d(self._screen)
+        img = np.transpose(img, (1, 0, 2))
+        return img.astype(np.uint8)
 
     def reset(self):
         self._space = pymunk.Space()
@@ -147,21 +152,26 @@ class SwarmBallSimulation(object):
 
     def _update_simulation_objects(self):
         self._update_bots()
-        self._enemy_speed += math.log1p(self.enemy_acceleration)
+        self._enemy_speed += math.log1p(self.enemy_acceleration) * 0.5
+        if self._enemy_speed > self._enemy_max_speed:
+            self._enemy_speed = self._enemy_max_speed
+            
         self._enemy_position += self._enemy_speed
 
     def _update_bots(self):
         for cluster in self._clusters:
-            cluster.threshold.position = cluster.threshold.position + 1
             for bot in cluster.bots:
                 if bot.body.position[1] < self.map_bottom_y_threshold:
                     # [ZMIANA] Usuwamy jednocześnie kształt (shape - bot) i jego ciało (body) z przestrzeni fizycznej
                     self._space.remove(bot.body, bot)
                     cluster.bots.remove(bot)
                 else:
-                    bot.body.angular_velocity = utils.get_bot_velocity(
-                        cluster.threshold.position,
-                        bot.body.position.x
+                    bot.body.velocity = (
+                        utils.get_bot_velocity(
+                            cluster.threshold.position,
+                            bot.body.position.x
+                        ),
+                        bot.body.velocity.y
                     )
 
     def _update_map(self):

@@ -219,3 +219,31 @@ To open a shell inside the container:
 ```bash
 docker compose run --rm swarmball bash
 ```
+PPO Model Training & Execution (New)
+The project includes an optimized Proximal Policy Optimization (PPO) model using Stable-Baselines3, leveraging vector observations instead of raw pixels for faster convergence.
+
+1. Train the PPO Model (Docker - Headless)
+Training is fully parallelized and runs optimally inside the GPU container. GUI rendering is disabled during training to maximize performance (FPS).
+
+```bash
+docker compose build gpu
+docker compose run --rm gpu python3 -u test_baseline.py
+```
+(Optional) If you want to clear the previous learning and train from scratch, add the --force-new flag at the end.
+
+The best checkpoints will automatically be saved to models/best/ and the final model to models/ppo_swarmball.zip.
+
+2. Run the Visual Simulation (Local - Windows)
+To watch the trained nanobots navigate the map and push the goal, run the evaluation script locally (outside of Docker) so your operating system can render the PyGame window:
+
+```bash
+python test_run.py --model-path models/ppo_swarmball --episodes 5
+```
+This will open the simulation window and run 5 evaluation episodes.
+
+3. Headless Model Evaluation (Docker)
+If you only want to collect statistics (mean reward, steps) without visual rendering, you can run the evaluation script inside the Docker container using the --no-render flag:
+
+```bash
+docker compose run --rm gpu python3 -u test_run.py --model-path models/ppo_swarmball --no-render --episodes 10
+```
