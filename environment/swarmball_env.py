@@ -13,9 +13,9 @@ class SwarmBall(gym.Env):
 
     def __init__(
         self,
-        acc_factor=0.12,        # było 0.08 — threshold przesuwa się szybciej
+        acc_factor=0.12,        
         number_of_clusters=3,
-        v_max=8,                # było 5 — wyższy pułap prędkości threshold
+        v_max=8,                
         number_of_bots_per_cluster=10,
         goal_target=300.0,
         render_mode=None,
@@ -223,7 +223,7 @@ class SwarmBall(gym.Env):
 
     def render(self):
         if self.render_mode == "human":
-            self.sim.redraw()
+            self.sim.redraw(goal_target=self.goal_target)
         elif self.render_mode == "rgb_array":
             return self.sim.space_near_goal_object()
 

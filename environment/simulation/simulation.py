@@ -220,16 +220,52 @@ class SwarmBallSimulation(object):
         pygame_utils.draw_clusters(self._screen, self._clusters, offset)
         pygame_utils.draw_goal_object(self._screen, self._goal_object, self.screen_size)
 
-    def redraw(self, clock=False):
+    def redraw(self, clock=True, goal_target=None):
         self._update_screen()
+
         if clock is True:
             self._clock.tick(self.ticks_per_render_frame)
 
-        # [ZMIANA] Dodano obliczenie "offset", ponieważ zmienna nie była tutaj zdefiniowana i powodowała NameError
-        offset = (self.screen_size[0] / 2 - self._goal_object.body.position[0],
-                  -self.screen_size[1] // 2 + self._goal_object.body.position[1])
+        offset = (
+            self.screen_size[0] / 2 - self._goal_object.body.position[0],
+            -self.screen_size[1] // 2 + self._goal_object.body.position[1],
+        )
 
-        pygame_utils.draw_enemy(self._screen, self._enemy_position, offset, self.screen_size)
+        pygame_utils.draw_enemy(
+            self._screen,
+            self._enemy_position,
+            offset,
+            self.screen_size,
+        )
+
+        if goal_target is not None:
+            screen_x = int(goal_target + offset[0])
+
+            # Draw only if finish line is near the current camera view.
+            if -100 <= screen_x <= self.screen_size[0] + 100:
+                pygame.draw.line(
+                    self._screen,
+                    (0, 180, 0),
+                    (screen_x, 0),
+                    (screen_x, self.screen_size[1]),
+                    4,
+                )
+
+                font = pygame.font.SysFont(None, 32)
+                label = font.render("FINISH", True, (0, 180, 0))
+                self._screen.blit(label, (screen_x + 8, 20))
+
+                # Small flag
+                pygame.draw.polygon(
+                    self._screen,
+                    (0, 180, 0),
+                    [
+                        (screen_x, 55),
+                        (screen_x + 40, 70),
+                        (screen_x, 85),
+                    ],
+                )
+
         pygame.display.flip()
 
 
