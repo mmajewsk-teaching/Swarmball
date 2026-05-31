@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument(
         "--goal-target",
         type=float,
-        default=300.0,
+        default=500.0,
         help="Target X position used by the environment.",
     )
 

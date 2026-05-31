@@ -61,6 +61,8 @@ def make_env(
     goal_target: float,
     enemy_acceleration: float,
     enemy_max_speed: float,
+    acc_factor: float,
+    v_max: float,
     monitor_dir: Path | None = None,
 ):
     """Create one monitored SwarmBall environment instance."""
@@ -69,8 +71,8 @@ def make_env(
         env = SwarmBall(
             number_of_clusters=3,
             number_of_bots_per_cluster=10,
-            acc_factor=0.12,
-            v_max=8,
+            acc_factor=acc_factor,
+            v_max=v_max,
             goal_target=goal_target,
             enemy_acceleration=enemy_acceleration,
             enemy_max_speed=enemy_max_speed,
@@ -101,6 +103,8 @@ def create_vector_env(args, run_dir: Path):
             enemy_acceleration=args.enemy_acceleration,
             enemy_max_speed=args.enemy_max_speed,
             monitor_dir=monitor_dir,
+            acc_factor=args.acc_factor,
+            v_max=args.v_max,
         )
         for rank in range(args.n_envs)
     ]
@@ -122,6 +126,8 @@ def create_eval_env(args, run_dir: Path):
                 goal_target=args.goal_target,
                 enemy_acceleration=args.enemy_acceleration,
                 enemy_max_speed=args.enemy_max_speed,
+                acc_factor=args.acc_factor,
+                v_max=args.v_max,
                 monitor_dir=run_dir / "eval_monitor",
             )
         ]
@@ -375,7 +381,7 @@ def parse_args():
     parser.add_argument(
         "--goal-target",
         type=float,
-        default=300.0,
+        default=500.0,
         help="Target X position that the goal object should reach.",
     )
 
@@ -404,6 +410,20 @@ def parse_args():
         "--continue-training",
         action="store_true",
         help="Continue training from runs/<run-name>/model.zip instead of starting a new model.",
+    )
+    
+    parser.add_argument(
+        "--acc-factor",
+        type=float,
+        default=0.12,
+        help="Acceleration factor for threshold movement.",
+    )
+
+    parser.add_argument(
+        "--v-max",
+        type=float,
+        default=8.0,
+        help="Maximum threshold velocity.",
     )
 
     return parser.parse_args()

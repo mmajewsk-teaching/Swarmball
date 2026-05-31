@@ -1,5 +1,6 @@
 import argparse
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -32,36 +33,43 @@ def parse_args():
         help="Rolling window size for smoothing rewards.",
     )
 
+    parser.add_argument(
+        "--include-eval",
+        action="store_true",
+        help="Also plot eval_monitor files. By default only training monitor files are used.",
+    )
+
     return parser.parse_args()
 
 
-def find_monitor_files(runs_dir: Path):
+def find_monitor_files_by_run(runs_dir: Path, include_eval: bool):
     """
-    Finds Stable-Baselines3 monitor files inside runs/* directories.
+    Finds monitor CSV files recursively and groups them by run directory.
 
-    Examples:
-    runs/ppo_100k_obs_v2_seed_42/training.monitor.csv
-    runs/ppo_100k_obs_v2_seed_42/monitor.monitor.csv
+    Supported examples:
+    runs/run_name/monitor/env_0.monitor.csv
+    runs/run_name/monitor/env_1.monitor.csv
+    runs/run_name/eval_monitor/env_0.monitor.csv
+    runs/run_name/training.monitor.csv
+    runs/run_name/monitor.monitor.csv
     """
-    patterns = [
-        "*.monitor.csv",
-        "*monitor*.csv",
-    ]
+    files_by_run = defaultdict(list)
 
-    files = []
+    for file_path in runs_dir.rglob("*.monitor.csv"):
+        relative_parts = file_path.relative_to(runs_dir).parts
 
-    for pattern in patterns:
-        files.extend(runs_dir.glob(f"*/{pattern}"))
+        if len(relative_parts) < 2:
+            continue
 
-    unique_files = []
-    seen = set()
+        run_name = relative_parts[0]
 
-    for file_path in files:
-        if file_path not in seen:
-            unique_files.append(file_path)
-            seen.add(file_path)
+        # By default, skip eval_monitor because we want the training curve.
+        if not include_eval and "eval_monitor" in relative_parts:
+            continue
 
-    return unique_files
+        files_by_run[run_name].append(file_path)
+
+    return dict(files_by_run)
 
 
 def read_monitor_csv(file_path: Path):
@@ -81,28 +89,40 @@ def read_monitor_csv(file_path: Path):
     return pd.read_csv(file_path, comment="#")
 
 
-def prepare_training_curve(df: pd.DataFrame):
-    required_columns = {"r", "l"}
+def prepare_training_curve(monitor_files: list[Path]):
+    frames = []
 
-    if not required_columns.issubset(df.columns):
-        raise ValueError(
-            f"Monitor CSV must contain columns {required_columns}, "
-            f"but got {set(df.columns)}"
-        )
+    for file_path in monitor_files:
+        df = read_monitor_csv(file_path)
 
-    df = df.copy()
+        required_columns = {"r", "l"}
+        if not required_columns.issubset(df.columns):
+            raise ValueError(
+                f"Monitor CSV must contain columns {required_columns}, "
+                f"but got {set(df.columns)} in {file_path}"
+            )
 
-    # Timesteps are calculated as cumulative episode lengths.
+        df = df.copy()
+        df["source_file"] = str(file_path)
+        frames.append(df)
+
+    if not frames:
+        raise ValueError("No monitor files provided.")
+
+    df = pd.concat(frames, ignore_index=True)
+
+    # If Monitor has elapsed time column, use it to sort episodes from parallel envs.
+    if "t" in df.columns:
+        df = df.sort_values("t").reset_index(drop=True)
+
+    # Approximate global training timesteps as cumulative episode lengths.
     df["timesteps"] = df["l"].cumsum()
 
     return df
 
 
-def plot_single_run(monitor_file: Path, output_dir: Path, window: int):
-    run_name = monitor_file.parent.name
-
-    df = read_monitor_csv(monitor_file)
-    df = prepare_training_curve(df)
+def plot_single_run(run_name: str, monitor_files: list[Path], output_dir: Path, window: int):
+    df = prepare_training_curve(monitor_files)
 
     plt.figure(figsize=(10, 6))
 
@@ -148,22 +168,29 @@ def main():
         print(f"Runs directory does not exist: {runs_dir}")
         sys.exit(1)
 
-    monitor_files = find_monitor_files(runs_dir)
+    files_by_run = find_monitor_files_by_run(
+        runs_dir=runs_dir,
+        include_eval=args.include_eval,
+    )
 
-    if not monitor_files:
+    if not files_by_run:
         print(f"No monitor CSV files found in: {runs_dir}")
         print("Expected files like:")
-        print("  runs/ppo_100k_obs_v2_seed_42/training.monitor.csv")
-        print("  runs/ppo_100k_obs_v2_seed_42/monitor.monitor.csv")
+        print("  runs/<run_name>/monitor/env_0.monitor.csv")
+        print("  runs/<run_name>/monitor/env_1.monitor.csv")
+        print("  runs/<run_name>/training.monitor.csv")
         sys.exit(1)
 
     print("Found monitor files:")
-    for monitor_file in monitor_files:
-        print(f"- {monitor_file}")
+    for run_name, files in files_by_run.items():
+        print(f"- {run_name}:")
+        for file_path in files:
+            print(f"  - {file_path}")
 
-    for monitor_file in monitor_files:
+    for run_name, monitor_files in files_by_run.items():
         plot_single_run(
-            monitor_file=monitor_file,
+            run_name=run_name,
+            monitor_files=monitor_files,
             output_dir=output_dir,
             window=args.window,
         )
