@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+import json
 
 import numpy as np
 from stable_baselines3 import PPO
@@ -184,6 +185,11 @@ def train(args):
             f"Model already exists: {existing_model}. "
             f"Use --continue-training to continue it or choose a different --run-name."
         )
+        
+    config_path = run_dir / "config.json"
+
+    with config_path.open("w", encoding="utf-8") as file:
+        json.dump(vars(args), file, indent=2)
 
     print(f"Run directory: {run_dir}")
     print(f"Training seed: {args.seed}")
@@ -280,6 +286,22 @@ def train(args):
     )
     print(f"Mean reward: {mean_reward:.2f} ± {std_reward:.2f}")
 
+    print("\nUseful commands:")
+    print(
+        f"python scripts/evaluate_model.py "
+        f"--model-path {best_model_dir / 'best_model'} "
+        f"--goal-target {args.goal_target} "
+        f"--enemy-acceleration {args.enemy_acceleration} "
+        f"--enemy-max-speed {args.enemy_max_speed}"
+    )
+    print(
+        f"python scripts/watch_model.py "
+        f"--model-path {best_model_dir / 'best_model'} "
+        f"--goal-target {args.goal_target} "
+        f"--enemy-acceleration {args.enemy_acceleration} "
+        f"--enemy-max-speed {args.enemy_max_speed}"
+    )
+    
     vec_env.close()
     eval_env.close()
 

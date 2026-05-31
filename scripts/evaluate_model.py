@@ -98,6 +98,18 @@ def main():
     args = parse_args()
 
     env = make_env(args)
+    
+    model_file = Path(args.model_path)
+    if model_file.suffix != ".zip":
+        model_file = model_file.with_suffix(".zip")
+
+    if not model_file.exists():
+        raise FileNotFoundError(
+            f"Model file not found: {model_file}. "
+            "Pass --model-path without .zip, for example: "
+            "runs/ppo_2m_seed_42/best_model/best_model"
+        )
+
     model = PPO.load(args.model_path, device="cpu")
 
     episode_rewards = []
