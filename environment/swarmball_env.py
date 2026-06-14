@@ -40,8 +40,8 @@ class SwarmBall(gym.Env):
             low=0.0, high=1.0, shape=(number_of_clusters,), dtype=np.float32
         )
 
-        # Obserwacje: [goal_pos, goal_vel, enemy_gap, enemy_speed, dist_to_target,
-        #              (thresh_rel, bots_rel, n_bots, thresh_v) * N]
+        # Observation vector: [goal_pos, goal_vel, enemy_gap, enemy_speed, dist_to_target,
+        #                      (thresh_rel, bots_rel, n_bots, thresh_v) * N]
         obs_size = 5 + number_of_clusters * 4
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(obs_size,), dtype=np.float32
@@ -52,7 +52,7 @@ class SwarmBall(gym.Env):
         self._initial_goal_pos = 0.0
 
     # ------------------------------------------------------------------
-    # Obserwacja
+    # Observation
     # ------------------------------------------------------------------
 
     def _get_obs(self):
@@ -99,18 +99,18 @@ class SwarmBall(gym.Env):
         goal_vel = float(self.sim._goal_object.body.velocity[0])
         thresh_positions = self.sim.threshold_positions()
 
-        # 1. Postęp kwadratu w prawo — główna nagroda
+        # 1. Main reward for moving the goal object to the right.
         progress = goal_pos - self._prev_goal_pos
         reward_progress = progress * 5.0
 
-        # 2. Nagroda za to że threshold jest TUŻ ZA kwadratem (nie za daleko, nie za blisko)
-        #    Optymalny punkt: threshold ~30-80 jednostek za kwadratem żeby boty go pchały
+        # 2. Reward for having the threshold close to the square (not too far, not too close)
+        #    Optimal point: threshold ~30-80 units behind the square so bots push it
         total_bots = 0
         bots_pushing = 0
         for cluster in self.sim._clusters:
             for bot in cluster.bots:
                 total_bots += 1
-                if bot.body.position[0] < goal_pos + 10:  # bot jest za lub tuż przy kwadracie
+                if bot.body.position[0] < goal_pos + 10:  
                     bots_pushing += 1
 
         if total_bots > 0:
@@ -119,19 +119,18 @@ class SwarmBall(gym.Env):
         else:
             reward_pushing = 0.0
 
-        # 3. Nagroda za threshold blisko kwadratu (od tyłu, +20..+100 za goal)
-        #    Threshold POWINIEN być trochę za kwadratem żeby boty mogły go dosięgnąć
+        # 3. Reward for having the threshold close to the square (not too far, not too close)
         mean_thresh = float(np.mean(thresh_positions))
-        # Idealny offset: threshold 40 jednostek ZA kwadratem (po lewej)
+        # Perfect offset: threshold 40 units BEHIND the square (left of it)
         ideal_thresh_pos = goal_pos - 40.0
         thresh_offset_err = abs(mean_thresh - ideal_thresh_pos)
-        # Gaussowska nagroda - max gdy threshold dokładnie 40 jednostek za kwadratem
+        # Gaussian reward - max when threshold exactly 40 units beyond the square
         reward_thresh_pos = np.exp(-thresh_offset_err / 150.0) * 1.0
 
-        # 4. Nagroda za prędkość kwadratu w prawo
+        # 4. Reward for the square's velocity to the right
         reward_velocity = max(0.0, goal_vel) * 0.15
 
-        # 5. Dystans do wroga — lekka nagroda za ucieczkę
+        # 5. Small reward for keeping distance from the enemy.
         enemy_gap = goal_pos - float(self.sim._enemy_position)
         reward_enemy_gap = np.tanh(enemy_gap / 300.0) * 0.2
         if enemy_gap < 100.0:
@@ -139,11 +138,11 @@ class SwarmBall(gym.Env):
         if enemy_gap <= 0.0:
             reward_enemy_gap -= 5.0
 
-        # 6. Kara za stracone boty
+        # 6. Penalty for lost bots.
         expected_bots = self.cluster_count * self.bots_per_cluster
         reward_bots = -0.3 * (expected_bots - total_bots) / max(expected_bots, 1)
 
-        # 7. Postęp % do mety
+        # 7.  Reward based on percentage progress toward the target.
         if self._initial_goal_pos < self.goal_target:
             total_dist = self.goal_target - self._initial_goal_pos
             progress_pct = max(0.0, (goal_pos - self._initial_goal_pos) / total_dist)
@@ -167,9 +166,9 @@ class SwarmBall(gym.Env):
     # ------------------------------------------------------------------
 
     def step(self, action):
-        # ZMIANA: bardziej responsywna akceleracja (mniej smoothing = szybsza reakcja)
+        # More responsive acceleration with less smoothing.
         self.thresh_vel = (
-            self.thresh_vel * 0.4                          # było 0.6 — mniej inercji
+            self.thresh_vel * 0.4                          # Previously 0.6, now less inertia.
             + (action - 0.5) * 2.0 * self.acc_factor * self.v_max
         )
         self.thresh_vel = np.clip(self.thresh_vel, -self.v_max, self.v_max)
