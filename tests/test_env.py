@@ -1,32 +1,54 @@
-import sys
 import os
+import sys
 
-# Dodajemy główny folder projektu do ścieżki Pythona, żeby importy działały
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import numpy as np
+
+# Add project root to Python path.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from environment.swarmball_env import SwarmBall
 
 
-def test_smoke_step_and_reset():
-    # [ZMIANA] Podstawowy test sprawdzający, czy reset i step nie rzucają błędów
-    print("Inicjalizacja środowiska...")
+def test_reset_returns_valid_observation():
     env = SwarmBall()
 
-    print("Testowanie reset()...")
-    obs, info = env.reset()
-    assert isinstance(obs, dict), "Reset musi zwracać słownik (dict)"
-    assert 'picture' in obs and 'thresholds' in obs, "Brakuje kluczy w obserwacji"
+    obs, info = env.reset(seed=42)
 
-    print("Testowanie step()...")
-    action = env.action_space.sample()  # Losowa akcja
+    assert isinstance(obs, np.ndarray)
+    assert env.observation_space.contains(obs)
+    assert isinstance(info, dict)
+
+    env.close()
+
+
+def test_step_returns_valid_values():
+    env = SwarmBall()
+
+    env.reset(seed=42)
+    action = env.action_space.sample()
+
     obs, reward, terminated, truncated, info = env.step(action)
 
-    assert isinstance(reward, float), "Nagroda musi być typu float"
-    assert isinstance(terminated, bool), "Terminated musi być typu bool"
-    assert isinstance(truncated, bool), "Truncated musi być typu bool"
+    assert isinstance(obs, np.ndarray)
+    assert env.observation_space.contains(obs)
+    assert isinstance(float(reward), float)
+    assert isinstance(terminated, bool)
+    assert isinstance(truncated, bool)
+    assert isinstance(info, dict)
 
-    print("✅ Smoke test zaliczony! Środowisko działa poprawnie z Gymnasium API.")
+    env.close()
 
 
-if __name__ == "__main__":
-    test_smoke_step_and_reset()
+def test_step_info_contains_evaluation_fields():
+    env = SwarmBall()
+
+    env.reset(seed=42)
+    action = env.action_space.sample()
+
+    _, _, _, _, info = env.step(action)
+
+    assert "is_success" in info
+    assert "enemy_caught" in info
+    assert "goal_progress_pct" in info
+
+    env.close()
